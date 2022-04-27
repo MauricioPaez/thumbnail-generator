@@ -1,8 +1,6 @@
-# Welcome to your CDK TypeScript project
+# CDK TypeScript API cognito-protected project
 
-This is a blank project for CDK development with TypeScript.
-
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+This a project that uses the CDK with TypeScript to provision the cloud infrastructure for the Thumbnail Generator API.
 
 ## Useful commands
 
