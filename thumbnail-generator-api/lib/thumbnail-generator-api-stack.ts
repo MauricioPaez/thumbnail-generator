@@ -30,7 +30,7 @@ export class ThumbnailGeneratorApiStack extends Stack {
     const generator = thumbnailGeneratorRestApi.root.addResource("generate");
 
     generator.addMethod(
-      "GET",
+      "POST",
       new LambdaIntegration(thumbnailGeneratorFunction)
     );
   }
