@@ -1,6 +1,6 @@
-# CDK TypeScript API cognito-protected project
+# Thumbnail Generator App CDK project
 
-This a project that uses the CDK with TypeScript to provision the cloud infrastructure for the Thumbnail Generator API.
+This a project that uses the CDK with TypeScript to provision the cloud infrastructure for the Thumbnail Generator App.
 
 ## Useful commands
 

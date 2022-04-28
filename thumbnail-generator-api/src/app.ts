@@ -3,13 +3,16 @@ import {
   APIGatewayProxyResult,
   Context,
 } from "aws-lambda";
+import sharp = require("sharp");
 
-type FileType = "png" | "jpeg" | "jpg";
+interface File {
+  name: string;
+  type: string;
+  size: number;
+}
 
 interface GenerateThumbnailsRequestModel {
-  fileName: string;
-  fileType: FileType;
-  file: any;
+  file: File;
 }
 
 export const lambdaHandler = async function (
@@ -17,17 +20,33 @@ export const lambdaHandler = async function (
   context: Context
 ): Promise<APIGatewayProxyResult> {
   console.log(event);
+  let responseBody = null;
 
   if (event.body) {
     const requestModel: GenerateThumbnailsRequestModel = JSON.parse(event.body);
 
     if (
-      requestModel.fileType !== "png" &&
-      requestModel.fileType !== "jpeg" &&
-      requestModel.fileType !== "jpg"
+      requestModel.file.type !== "image/png" &&
+      requestModel.file.type !== "jpeg"
     ) {
-      return { statusCode: 417, body: "File type must be PNG, JPEG or JPG" };
+      return { statusCode: 417, body: "File type must be PNG or JPEG" };
     }
+
+    if (requestModel.file.size > 5000000) {
+      return { statusCode: 417, body: "File size exceeded the 5MB limit" };
+    }
+
+    responseBody = await Promise.all([
+      sharp(requestModel.file as any)
+        .resize(400, 300)
+        .toBuffer(),
+      sharp(requestModel.file as any)
+        .resize(160, 120)
+        .toBuffer(),
+      sharp(requestModel.file as any)
+        .resize(120, 120)
+        .toBuffer(),
+    ]);
   } else {
     return {
       statusCode: 400,
@@ -35,5 +54,11 @@ export const lambdaHandler = async function (
     };
   }
 
-  return { statusCode: 201, body: "Hello from AWS CDK and SAM!" };
+  const proxyResponse: APIGatewayProxyResult = {
+    statusCode: 200,
+    body: Buffer.from(JSON.stringify(responseBody)).toString("base64"),
+    isBase64Encoded: true,
+  };
+
+  return proxyResponse;
 };
