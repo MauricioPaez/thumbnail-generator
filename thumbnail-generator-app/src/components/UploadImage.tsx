@@ -16,6 +16,7 @@ import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternate
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import React from "react";
+import axios from "axios";
 
 export interface IUploadImageProps {}
 
@@ -86,7 +87,17 @@ export default class UploadImage extends React.Component<
     element.value = "";
   }
 
-  public getThumbnails(): void {}
+  public getThumbnails(): void {
+    const apiUrl = process.env.PUBLIC_API;
+    if (apiUrl) {
+      axios
+        .post(`${apiUrl}/generate`, this.state.selectedFile)
+        .then((response) => {
+          if (response) {
+          }
+        });
+    }
+  }
 
   public clearSelectedFile(): void {
     this.setState(() => ({ selectedFile: null }));
