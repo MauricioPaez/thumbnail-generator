@@ -56,7 +56,9 @@ export const lambdaHandler = async function (
 
   const proxyResponse: APIGatewayProxyResult = {
     statusCode: 200,
-    body: Buffer.from(JSON.stringify(responseBody)).toString("base64"),
+    body: responseBody
+      ? Buffer.from(JSON.stringify(responseBody)).toString("base64")
+      : "Unable to transform file",
     isBase64Encoded: true,
   };
 

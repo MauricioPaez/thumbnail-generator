@@ -1,6 +1,6 @@
 import { RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import { LambdaIntegration, LambdaRestApi } from "aws-cdk-lib/aws-apigateway";
-import { Code, Function, Runtime } from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { BucketDeployment, Source } from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
@@ -26,13 +26,12 @@ export class ThumbnailGeneratorApiStack extends Stack {
     );
     bucketDeployment.node.addDependency(frontendBucket);
 
-    const thumbnailGeneratorFunction = new Function(
+    const thumbnailGeneratorFunction = new NodejsFunction(
       this,
       "ThumbnailGenerator",
       {
-        runtime: Runtime.NODEJS_14_X,
-        handler: "app.lambdaHandler",
-        code: Code.fromAsset("./src"),
+        handler: "lambdaHandler",
+        entry: "./src/app.ts"
       }
     );
 
@@ -52,5 +51,11 @@ export class ThumbnailGeneratorApiStack extends Stack {
       "POST",
       new LambdaIntegration(thumbnailGeneratorFunction)
     );
+
+    const uploadsBucket = new Bucket(this, "ThumbnailGeneratorUploadsBucket", {
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    uploadsBucket.grantReadWrite(thumbnailGeneratorFunction);
   }
 }
