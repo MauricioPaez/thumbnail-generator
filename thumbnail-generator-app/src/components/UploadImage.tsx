@@ -88,31 +88,35 @@ export default class UploadImage extends React.Component<
   }
 
   public getThumbnails(): void {
-    const apiUrl =
-      "https://2jnja0vueb.execute-api.us-east-1.amazonaws.com/prod/";
+    const apiUrl = process.env.REACT_APP_PUBLIC_API;
     const file = this.state.selectedFile;
     if (apiUrl && file) {
       axios
         .get(
           `${apiUrl}/credentials?fileName=${file.name}&fileType=${file.type}&fileSize=${file.size}`
         )
-        .then((response) => {
-          if (response) {
-            console.log(response);
+        .then(
+          (response) => {
+            if (response) {
+              console.log(response);
 
-            axios
-              .put(response.toString(), JSON.stringify(file), {
-                headers: {
-                  "Content-Type": file.type,
-                },
-              })
-              .then((response) => {
-                if (response) {
-                  console.log(response);
-                }
-              });
+              axios
+                .put(response.toString(), JSON.stringify(file), {
+                  headers: {
+                    "Content-Type": file.type,
+                  },
+                })
+                .then((response) => {
+                  if (response) {
+                    console.log(response);
+                  }
+                });
+            }
+          },
+          (err) => {
+            console.log(err);
           }
-        });
+        );
     }
   }
 
