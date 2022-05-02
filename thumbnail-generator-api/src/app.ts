@@ -20,7 +20,7 @@ export const lambdaHandler = async function (
   context: Context
 ): Promise<APIGatewayProxyResult> {
   console.log(event);
-  let responseBody = null;
+  let resizedImg = null;
 
   if (event.body) {
     const requestModel: GenerateThumbnailsRequestModel = JSON.parse(event.body);
@@ -36,17 +36,8 @@ export const lambdaHandler = async function (
       return { statusCode: 417, body: "File size exceeded the 5MB limit" };
     }
 
-    responseBody = await Promise.all([
-      sharp(requestModel.file as any)
-        .resize(400, 300)
-        .toBuffer(),
-      sharp(requestModel.file as any)
-        .resize(160, 120)
-        .toBuffer(),
-      sharp(requestModel.file as any)
-        .resize(120, 120)
-        .toBuffer(),
-    ]);
+    resizedImg = await sharp(event.body).resize(400, 300).toFormat('png').toBuffer()
+
   } else {
     return {
       statusCode: 400,
@@ -56,8 +47,8 @@ export const lambdaHandler = async function (
 
   const proxyResponse: APIGatewayProxyResult = {
     statusCode: 200,
-    body: responseBody
-      ? Buffer.from(JSON.stringify(responseBody)).toString("base64")
+    body: resizedImg
+      ? Buffer.from(resizedImg).toString("base64")
       : "Unable to transform file",
     isBase64Encoded: true,
   };
