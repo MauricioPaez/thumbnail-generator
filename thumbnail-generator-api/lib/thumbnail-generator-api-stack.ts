@@ -1,5 +1,10 @@
 import { Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
-import { LambdaIntegration, LambdaRestApi } from "aws-cdk-lib/aws-apigateway";
+import {
+  Cors,
+  IResource,
+  LambdaIntegration,
+  LambdaRestApi,
+} from "aws-cdk-lib/aws-apigateway";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Bucket, CorsRule, HttpMethods } from "aws-cdk-lib/aws-s3";
 import { BucketDeployment, Source } from "aws-cdk-lib/aws-s3-deployment";
@@ -28,62 +33,11 @@ export class ThumbnailGeneratorApiStack extends Stack {
     );
     bucketDeployment.node.addDependency(frontendBucket);
 
-    // Lambda function that generates a PutObject presigned URL
-    const createCredentialsFunction = new NodejsFunction(
-      this,
-      "CreateCredentialsFunction",
-      {
-        handler: "lambdaHandler",
-        entry: "./src/credentials.ts",
-      }
-    );
-
-    // NodeJS lambda function that generates the thumbnails
-    const thumbnailGeneratorFunction = new NodejsFunction(
-      this,
-      "ThumbnailGenerator",
-      {
-        handler: "lambdaHandler",
-        entry: "./src/app.ts",
-        timeout: Duration.minutes(15),
-        memorySize: 1024,
-        bundling: {
-          nodeModules: ["sharp"],
-        },
-      }
-    );
-
-    // Lambda REST API
-    const thumbnailGeneratorRestApi = new LambdaRestApi(
-      this,
-      "thumbnailGeneratorRestApi",
-      {
-        restApiName: "Thumbnail Generator API",
-        handler: thumbnailGeneratorFunction,
-        proxy: false,
-      }
-    );
-
-    // Adding resources to the API
-    const generator = thumbnailGeneratorRestApi.root.addResource("generate");
-    const credentials =
-      thumbnailGeneratorRestApi.root.addResource("credentials");
-
-    // POST Method associated to the ThumbnailGeneratorFunction
-    generator.addMethod(
-      "POST",
-      new LambdaIntegration(thumbnailGeneratorFunction)
-    );
-
-    // GET Method associated to the CreateCredentialsFunction
-    credentials.addMethod(
-      "GET",
-      new LambdaIntegration(createCredentialsFunction)
-    );
-
+    // Create Uploads Bucket
     let corsRule: CorsRule = {
-      allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
-      allowedOrigins: ["*"],
+      allowedMethods: [HttpMethods.GET, HttpMethods.PUT, HttpMethods.POST],
+      allowedOrigins: Cors.ALL_ORIGINS,
+      allowedHeaders: ["*"],
     };
 
     const uploadsBucket = new Bucket(this, "ThumbnailGeneratorUploadsBucket", {
@@ -92,7 +46,80 @@ export class ThumbnailGeneratorApiStack extends Stack {
       cors: [corsRule],
     });
 
-    uploadsBucket.grantReadWrite(thumbnailGeneratorFunction);
-    uploadsBucket.grantPut(createCredentialsFunction);
+    // Lambda function that generates a PutObject presigned URL
+    const createPresignedUrlFunction = new NodejsFunction(
+      this,
+      "CreatePresignedUrlFunction",
+      {
+        handler: "lambdaHandler",
+        entry: "./src/presigned-url.ts",
+        environment: {
+          UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
+          REGION: this.region,
+        },
+      }
+    );
+    uploadsBucket.grantPut(createPresignedUrlFunction);
+
+    // NodeJS lambda function that generates the thumbnails
+    const thumbnailGeneratorFunction = new NodejsFunction(
+      this,
+      "ThumbnailGenerator",
+      {
+        handler: "lambdaHandler",
+        entry: "./src/generate-thumbnails.ts",
+        timeout: Duration.minutes(15),
+        memorySize: 1024,
+        bundling: {
+          nodeModules: ["sharp"],
+        },
+        environment: {
+          UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
+          REGION: this.region,
+        },
+      }
+    );
+    uploadsBucket.grantPut(thumbnailGeneratorFunction);
+
+    // Lambda REST API
+    const thumbnailGeneratorRestApi = new LambdaRestApi(
+      this,
+      "thumbnailGeneratorRestApi",
+      {
+        restApiName: "Thumbnail Generator API",
+        description: "REST API used to generate thumbnails",
+        handler: thumbnailGeneratorFunction,
+        proxy: false,
+        defaultCorsPreflightOptions: {
+          allowHeaders: [
+            "Content-Type",
+            "X-Amz-Date",
+            "Authorization",
+            "X-Api-Key",
+          ],
+          allowMethods: Cors.ALL_METHODS,
+          allowCredentials: true,
+          allowOrigins: Cors.ALL_ORIGINS,
+        },
+      }
+    );
+
+    // Adding resources to the API
+    const generatorResource: IResource =
+      thumbnailGeneratorRestApi.root.addResource("generate");
+    const presignedUrlResource: IResource =
+      thumbnailGeneratorRestApi.root.addResource("presignedUrl");
+
+    // POST Method associated to the ThumbnailGeneratorFunction
+    generatorResource.addMethod(
+      HttpMethods.GET,
+      new LambdaIntegration(thumbnailGeneratorFunction)
+    );
+
+    // GET Method associated to the CreatePresignedUrlFunction
+    presignedUrlResource.addMethod(
+      HttpMethods.GET,
+      new LambdaIntegration(createPresignedUrlFunction)
+    );
   }
 }
