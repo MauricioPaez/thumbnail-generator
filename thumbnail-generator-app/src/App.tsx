@@ -1,13 +1,10 @@
-import "./App.css";
-import Header from "./components/Header";
-import UploadImage from "./components/UploadImage";
+import PageLayout from "./components/PageLayout";
 
 function App() {
   return (
-    <div className="w-full">
-      <Header title="Thumbnail Generator" />
-      <UploadImage />
-    </div>
+    <>
+      <PageLayout />
+    </>
   );
 }
 

@@ -1,23 +1,28 @@
+import axios from "axios";
+import React from "react";
+
+import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
+import AspectRatioIcon from "@mui/icons-material/AspectRatio";
+import ClearIcon from "@mui/icons-material/Clear";
+import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
+import ImageIcon from "@mui/icons-material/Image";
+import PhotoSizeSelectLargeIcon from "@mui/icons-material/PhotoSizeSelectLarge";
 import {
   Button,
   CircularProgress,
   Grid,
-  IconButton,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-  Stack,
   Typography,
 } from "@mui/material";
-import ImageIcon from "@mui/icons-material/Image";
-import PhotoSizeSelectLargeIcon from "@mui/icons-material/PhotoSizeSelectLarge";
-import AspectRatioIcon from "@mui/icons-material/AspectRatio";
-import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
-import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
-import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
-import React from "react";
-import axios from "axios";
+
+import { Thumbnail } from "../types";
+import ErrorAlert from "./ErrorAlert";
+import FileChip from "./FileChip";
+import ThumbnailList from "./ThumbnailList";
+import DownloadIcon from "@mui/icons-material/Download";
 
 export interface IUploadImageProps {}
 
@@ -25,6 +30,7 @@ export interface IUploadImageState {
   selectedFile?: File | null;
   error?: string;
   loading?: boolean;
+  thumbnails?: Thumbnail[] | null;
 }
 
 interface GetPresignedUrlResponseModel {
@@ -57,6 +63,8 @@ export default class UploadImage extends React.Component<
     this.getThumbnails = this.getThumbnails.bind(this);
     this.clearSelectedFile = this.clearSelectedFile.bind(this);
     this.clearError = this.clearError.bind(this);
+    this.clearThumbnails = this.clearThumbnails.bind(this);
+    this.downloadThumbnails = this.downloadThumbnails.bind(this);
   }
 
   public validateFile(file: File): string {
@@ -67,7 +75,9 @@ export default class UploadImage extends React.Component<
     }
 
     if (!fileTypes.includes(file.type)) {
-      return `File type (${file.type}) is not PNG or JPEG`;
+      return `File type (${
+        file.type || file.name.split(".")[1]
+      }) is not PNG or JPEG`;
     }
 
     return "";
@@ -154,13 +164,31 @@ export default class UploadImage extends React.Component<
           return;
         }
 
-        window.open(generateThumbnailsResponse.data.getObjectSignedUrl400x300);
-
-        window.open(generateThumbnailsResponse.data.getObjectSignedUrl160x120);
-
-        window.open(generateThumbnailsResponse.data.getObjectSignedUrl120x120);
-
-        this.setState(() => ({ loading: false, selectedFile: null }));
+        let thumbnails: Thumbnail[] = [
+          {
+            src: generateThumbnailsResponse.data.getObjectSignedUrl120x120,
+            title: `120x120_${file.name}`,
+            width: 120,
+            height: 120,
+          },
+          {
+            src: generateThumbnailsResponse.data.getObjectSignedUrl160x120,
+            title: `160x120_${file.name}`,
+            width: 160,
+            height: 120,
+          },
+          {
+            src: generateThumbnailsResponse.data.getObjectSignedUrl400x300,
+            title: `400x300_${file.name}`,
+            width: 400,
+            height: 300,
+          },
+        ];
+        this.setState(() => ({
+          loading: false,
+          selectedFile: null,
+          thumbnails: thumbnails,
+        }));
       } catch (error) {
         this.setState(() => ({
           error: "Unable to get thumbnails, try again",
@@ -187,132 +215,172 @@ export default class UploadImage extends React.Component<
     this.setState(() => ({ error: "" }));
   }
 
+  public clearThumbnails(): void {
+    this.setState(() => ({ thumbnails: null }));
+  }
+
+  public downloadThumbnails(): void {
+    if (this.state.thumbnails) {
+      this.state.thumbnails.forEach((thumbnail) => {
+        setTimeout(() => {
+          window.open(thumbnail.src);
+        }, 200);
+      });
+    }
+  }
+
   public render() {
     return (
-      <div className="m-4">
-        <Typography className="text-slate-900" variant="h4">
-          Upload an image to get your thumbnails
-        </Typography>
+      <>
+        <div className="flex sm:flex-row flex-col sm:items-center sm:justify-center sm:pt-36 pt-10 sm:ml-0 ml-8">
+          {/* Instructions */}
+          <div className="flex flex-col text-white">
+            <Typography className="max-w-2xl" fontWeight={800} variant="h2">
+              Upload an image to get your thumbnails
+            </Typography>
 
-        <Typography my={2} variant="body1">
-          Upload an Image with the following conditions:
-        </Typography>
+            <Typography my={2} variant="body1">
+              Upload an Image with the following conditions:
+            </Typography>
 
-        <Grid>
-          <List>
-            <ListItem>
-              <ListItemIcon>
-                <ImageIcon />
-              </ListItemIcon>
-              <ListItemText primary="Must be in PNG, JPEG format" />
-            </ListItem>
-            <ListItem>
-              <ListItemIcon>
-                <PhotoSizeSelectLargeIcon />
-              </ListItemIcon>
-              <ListItemText primary="Cannot excede 5MB of size" />
-            </ListItem>
-          </List>
-        </Grid>
+            <Grid>
+              <List>
+                <ListItem>
+                  <ListItemIcon>
+                    <ImageIcon className="text-white" />
+                  </ListItemIcon>
+                  <ListItemText primary="Must be in PNG, JPEG format" />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <PhotoSizeSelectLargeIcon className="text-white" />
+                  </ListItemIcon>
+                  <ListItemText primary="Cannot excede 5MB of size" />
+                </ListItem>
+              </List>
+            </Grid>
 
-        <Typography my={2} variant="body1">
-          You will get three images with the following dimensions:
-        </Typography>
+            <Typography my={2} variant="body1">
+              You will get three images with the following dimensions:
+            </Typography>
 
-        <Grid>
-          <List>
-            <ListItem>
-              <ListItemIcon>
-                <AspectRatioIcon />
-              </ListItemIcon>
-              <ListItemText primary="400x300" />
-            </ListItem>
-            <ListItem>
-              <ListItemIcon>
-                <AspectRatioIcon />
-              </ListItemIcon>
-              <ListItemText primary="160x120" />
-            </ListItem>
-            <ListItem>
-              <ListItemIcon>
-                <AspectRatioIcon />
-              </ListItemIcon>
-              <ListItemText primary="120x120" />
-            </ListItem>
-          </List>
-        </Grid>
+            <Grid>
+              <List>
+                <ListItem>
+                  <ListItemIcon>
+                    <AspectRatioIcon className="text-white" />
+                  </ListItemIcon>
+                  <ListItemText primary="400x300" />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <AspectRatioIcon className="text-white" />
+                  </ListItemIcon>
+                  <ListItemText primary="160x120" />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <AspectRatioIcon className="text-white" />
+                  </ListItemIcon>
+                  <ListItemText primary="120x120" />
+                </ListItem>
+              </List>
+            </Grid>
+          </div>
 
-        <div className="my-2">
-          {this.state.selectedFile ? (
-            <>
-              <Button
-                variant="contained"
-                component="span"
-                endIcon={<CloudDownloadOutlinedIcon />}
-                onClick={this.getThumbnails}
-                disabled={this.state.loading}
-              >
-                {this.state.loading ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  "Get Thumbnails"
-                )}
-              </Button>
-            </>
-          ) : (
-            <>
-              <input
-                className="hidden"
-                accept="image/png, image/jpeg"
-                id="select-file-button"
-                type="file"
-                onChange={this.onSelectFile}
-                onClick={this.onInputFileClick}
+          {/* Actions and Thumbnails */}
+          <div className="flex flex-col sm:ml-4 ml-0">
+            {/* Thumbnails */}
+            {this.state.thumbnails && (
+              <ThumbnailList thumbnails={this.state.thumbnails} />
+            )}
+
+            {/* Actions */}
+            <div className="my-2 flex sm:flex-row flex-col">
+              {this.state.selectedFile ? (
+                <div className="max-w-10">
+                  <Button
+                    variant="contained"
+                    component="span"
+                    endIcon={<CloudDownloadOutlinedIcon />}
+                    onClick={this.getThumbnails}
+                    disabled={this.state.loading}
+                  >
+                    {this.state.loading ? (
+                      <CircularProgress size={24} />
+                    ) : (
+                      "Get Thumbnails"
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    className="hidden"
+                    accept="image/png, image/jpeg"
+                    id="select-file-button"
+                    type="file"
+                    onChange={this.onSelectFile}
+                    onClick={this.onInputFileClick}
+                  />
+                  <label htmlFor="select-file-button">
+                    <Button
+                      variant="contained"
+                      component="span"
+                      endIcon={<AddPhotoAlternateOutlinedIcon />}
+                    >
+                      Select Image
+                    </Button>
+                  </label>
+                </>
+              )}
+
+              {this.state.thumbnails && (
+                <>
+                  <div className="mx-0 sm:mx-2 my-2 sm:my-0">
+                    <Button
+                      variant="contained"
+                      component="span"
+                      endIcon={<ClearIcon />}
+                      onClick={this.clearThumbnails}
+                      color="error"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="max-w-10">
+                    <Button
+                      variant="contained"
+                      component="span"
+                      endIcon={<DownloadIcon />}
+                      onClick={this.downloadThumbnails}
+                    >
+                      Download all
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* File Chip */}
+            {this.state.selectedFile && (
+              <FileChip
+                disabled={!!this.state.loading}
+                file={this.state.selectedFile}
+                onClearFile={this.clearSelectedFile}
               />
-              <label htmlFor="select-file-button">
-                <Button
-                  variant="contained"
-                  component="span"
-                  endIcon={<AddPhotoAlternateOutlinedIcon />}
-                >
-                  Select Image
-                </Button>
-              </label>
-            </>
-          )}
+            )}
+
+            {/* Error Alert */}
+            {this.state.error && (
+              <ErrorAlert
+                errorMessage={this.state.error}
+                onClearError={this.clearError}
+              />
+            )}
+          </div>
         </div>
-
-        {this.state.selectedFile && (
-          <div className="my-4 inline-block rounded shadow-md bg-teal-800 hover:bg-teal-900 font-semibold text-xl text-white">
-            <Stack direction="row" spacing={1}>
-              <Typography p={2}>{this.state.selectedFile.name}</Typography>
-              <IconButton
-                color="inherit"
-                aria-label="clear"
-                onClick={this.clearSelectedFile}
-                disabled={this.state.loading}
-              >
-                <CloseOutlinedIcon />
-              </IconButton>
-            </Stack>
-          </div>
-        )}
-
-        {this.state.error && (
-          <div className="my-4 inline-block rounded shadow-md bg-red-500 hover:bg-red-600 font-semibold text-xl text-white">
-            <Stack direction="row" spacing={1}>
-              <Typography p={2}>{this.state.error}</Typography>
-              <IconButton
-                color="inherit"
-                aria-label="clear"
-                onClick={this.clearError}
-              >
-                <CloseOutlinedIcon />
-              </IconButton>
-            </Stack>
-          </div>
-        )}
-      </div>
+      </>
     );
   }
 }
