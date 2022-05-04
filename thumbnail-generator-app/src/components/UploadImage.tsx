@@ -32,6 +32,12 @@ interface GetPresignedUrlResponseModel {
   key: string;
 }
 
+interface GenerateThumbnailsResponseModel {
+  getObjectSignedUrl400x300: string;
+  getObjectSignedUrl160x120: string;
+  getObjectSignedUrl120x120: string;
+}
+
 const fileTypes = ["image/png", "image/jpeg"];
 
 export default class UploadImage extends React.Component<
@@ -95,41 +101,82 @@ export default class UploadImage extends React.Component<
     element.value = "";
   }
 
-  public getThumbnails(): void {
-    this.setState(() => ({ loading: true }));
+  public async getThumbnails(): Promise<void> {
+    this.setState(() => ({ loading: true, error: "" }));
 
     const apiUrl = process.env.REACT_APP_PUBLIC_API;
     const file = this.state.selectedFile;
     if (apiUrl && file) {
-      const getPresignedUrlRequest = `${apiUrl}/presignedUrl?fileName=${file.name}&fileType=${file.type}&fileSize=${file.size}`;
-      axios
-        .get(getPresignedUrlRequest, {
-          headers: { "Content-Type": "application/json" },
-        })
-        .then(
-          (response) => {
-            if (response) {
-              const responseModel: GetPresignedUrlResponseModel = response.data;
-              axios
-                .put(responseModel.presignedUrl, file, {
-                  headers: {
-                    "Content-Type": file.type,
-                  },
-                })
-                .then((response) => {
-                  if (response) {
-                    console.log(response);
-
-                    this.setState(() => ({ loading: false }));
-                  }
-                });
+      try {
+        const getPresignedUrlRequest = `${apiUrl}presignedUrl?fileName=${file.name}&fileType=${file.type}&fileSize=${file.size}`;
+        const presignedUrlResponse =
+          await axios.get<GetPresignedUrlResponseModel>(
+            getPresignedUrlRequest,
+            {
+              headers: { "Content-Type": "application/json" },
             }
-          },
-          (err) => {
-            console.log(err);
+          );
+
+        if (!presignedUrlResponse.data) {
+          this.setError("Unable to get thumbnails, try again");
+          console.error("Error getting S3 presigned URL");
+          return;
+        }
+
+        const uploadObjectResponse = await axios.put(
+          presignedUrlResponse.data.presignedUrl,
+          file,
+          {
+            headers: {
+              "Content-Type": file.type,
+            },
           }
         );
+
+        if (uploadObjectResponse.status !== 200) {
+          this.setError("Unable to get thumbnails, try again");
+          console.error("Error uploading original file to S3");
+          return;
+        }
+
+        const generateThumbnailsResponse =
+          await axios.get<GenerateThumbnailsResponseModel>(
+            `${apiUrl}generate?fileS3Key=${presignedUrlResponse.data.key}&fileName=${file.name}`
+          );
+
+        if (
+          !generateThumbnailsResponse.data.getObjectSignedUrl400x300 ||
+          !generateThumbnailsResponse.data.getObjectSignedUrl160x120 ||
+          !generateThumbnailsResponse.data.getObjectSignedUrl120x120
+        ) {
+          this.setError("Unable to get thumbnails, try again");
+          console.error("Empty getObject presignedUrls");
+          return;
+        }
+
+        window.open(generateThumbnailsResponse.data.getObjectSignedUrl400x300);
+
+        window.open(generateThumbnailsResponse.data.getObjectSignedUrl160x120);
+
+        window.open(generateThumbnailsResponse.data.getObjectSignedUrl120x120);
+
+        this.setState(() => ({ loading: false, selectedFile: null }));
+      } catch (error) {
+        this.setState(() => ({
+          error: "Unable to get thumbnails, try again",
+          loading: false,
+        }));
+        console.error("Error", error);
+        return;
+      }
     }
+  }
+
+  public setError(errorMessage: string): void {
+    this.setState(() => ({
+      error: errorMessage,
+      loading: false,
+    }));
   }
 
   public clearSelectedFile(): void {
