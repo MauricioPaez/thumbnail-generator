@@ -1,5 +1,6 @@
 import {
   Button,
+  CircularProgress,
   Grid,
   IconButton,
   List,
@@ -23,6 +24,12 @@ export interface IUploadImageProps {}
 export interface IUploadImageState {
   selectedFile?: File | null;
   error?: string;
+  loading?: boolean;
+}
+
+interface GetPresignedUrlResponseModel {
+  presignedUrl: string;
+  key: string;
 }
 
 const fileTypes = ["image/png", "image/jpeg"];
@@ -37,6 +44,7 @@ export default class UploadImage extends React.Component<
     this.state = {
       selectedFile: null,
       error: "",
+      loading: false,
     };
 
     this.onSelectFile = this.onSelectFile.bind(this);
@@ -88,20 +96,22 @@ export default class UploadImage extends React.Component<
   }
 
   public getThumbnails(): void {
+    this.setState(() => ({ loading: true }));
+
     const apiUrl = process.env.REACT_APP_PUBLIC_API;
     const file = this.state.selectedFile;
     if (apiUrl && file) {
+      const getPresignedUrlRequest = `${apiUrl}/presignedUrl?fileName=${file.name}&fileType=${file.type}&fileSize=${file.size}`;
       axios
-        .get(
-          `${apiUrl}/credentials?fileName=${file.name}&fileType=${file.type}&fileSize=${file.size}`
-        )
+        .get(getPresignedUrlRequest, {
+          headers: { "Content-Type": "application/json" },
+        })
         .then(
           (response) => {
             if (response) {
-              console.log(response);
-
+              const responseModel: GetPresignedUrlResponseModel = response.data;
               axios
-                .put(response.toString(), JSON.stringify(file), {
+                .put(responseModel.presignedUrl, file, {
                   headers: {
                     "Content-Type": file.type,
                   },
@@ -109,6 +119,8 @@ export default class UploadImage extends React.Component<
                 .then((response) => {
                   if (response) {
                     console.log(response);
+
+                    this.setState(() => ({ loading: false }));
                   }
                 });
             }
@@ -191,8 +203,13 @@ export default class UploadImage extends React.Component<
                 component="span"
                 endIcon={<CloudDownloadOutlinedIcon />}
                 onClick={this.getThumbnails}
+                disabled={this.state.loading}
               >
-                Get Thumbnails
+                {this.state.loading ? (
+                  <CircularProgress size={24} />
+                ) : (
+                  "Get Thumbnails"
+                )}
               </Button>
             </>
           ) : (
@@ -226,6 +243,7 @@ export default class UploadImage extends React.Component<
                 color="inherit"
                 aria-label="clear"
                 onClick={this.clearSelectedFile}
+                disabled={this.state.loading}
               >
                 <CloseOutlinedIcon />
               </IconButton>
