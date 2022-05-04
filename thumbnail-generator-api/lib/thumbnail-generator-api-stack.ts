@@ -80,6 +80,7 @@ export class ThumbnailGeneratorApiStack extends Stack {
       }
     );
     uploadsBucket.grantPut(thumbnailGeneratorFunction);
+    uploadsBucket.grantReadWrite(thumbnailGeneratorFunction);
 
     // Lambda REST API
     const thumbnailGeneratorRestApi = new LambdaRestApi(
